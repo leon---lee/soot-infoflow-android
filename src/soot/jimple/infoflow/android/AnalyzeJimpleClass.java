@@ -67,9 +67,18 @@ public class AnalyzeJimpleClass {
 	private final InfoflowAndroidConfiguration config;
 	private final Set<String> entryPointClasses;
 	private final Set<String> androidCallbacks;
+	private final Map<String, Integer> fragmentRegistrationMethods = new HashMap<String, Integer>() {{  
+	       put("android.app.FragmentTransaction add(android.app.Fragment,java.lang.String)", 0);
+	       put("android.app.FragmentTransaction add(int,android.app.Fragment)", 1);
+	       put("android.app.FragmentTransaction add(int,android.app.Fragment,java.lang.String)", 1);
+	       put("android.app.FragmentTransaction replace(int,android.app.Fragment)", 1);
+	       put("android.app.FragmentTransaction replace(int,android.app.Fragment,java.lang.String)", 1);
+	}};  
 	
 	private final Map<String, Set<SootMethodAndClass>> callbackMethods =
 			new HashMap<String, Set<SootMethodAndClass>>();
+	private final Map<String, Set<SootClass>> registedFragments =
+			new HashMap<String, Set<SootClass>>();
 	private final Map<String, Set<SootMethodAndClass>> callbackWorklist =
 			new HashMap<String, Set<SootMethodAndClass>>();
 	private final Map<String, Set<Integer>> layoutClasses =
@@ -189,6 +198,7 @@ public class AnalyzeJimpleClass {
 		while (reachableMethods.hasNext()) {
 			SootMethod method = reachableMethods.next().method();
 			analyzeMethodForCallbackRegistrations(lifecycleElement, method);
+			analyzeMethodForFragmentRegistrations(lifecycleElement, method);
 			analyzeMethodForDynamicBroadcastReceiver(method);
 		}
 	}
@@ -251,6 +261,104 @@ public class AnalyzeJimpleClass {
 		// Analyze all found callback classes
 		for (SootClass callbackClass : callbackClasses)
 			analyzeClass(callbackClass, lifecycleElement);
+	}
+	
+	/**
+	 * Analyzes the given method and looks for Fragment registrations
+	 * @param lifecycleElement The Activity element with which
+	 * to associate the found Fragments
+	 * @param method The method in which to look for Fragments
+	 */
+	private void analyzeMethodForFragmentRegistrations(SootClass activityElement, SootMethod method) {
+		// Do not analyze system classes
+		if (method.getDeclaringClass().getName().startsWith("android.")
+				|| method.getDeclaringClass().getName().startsWith("java."))
+			return;
+		if (!method.isConcrete())
+			return;
+		
+		ExceptionalUnitGraph graph = new ExceptionalUnitGraph(method.retrieveActiveBody());
+		SmartLocalDefs smd = new SmartLocalDefs(graph, new SimpleLiveLocals(graph));
+
+		// Iterate over all statement and find Fragment registration
+		SootClass fragmentClass = null;
+		for (Unit u : method.retrieveActiveBody().getUnits()) {
+			Stmt stmt = (Stmt) u;
+			// fragment registrations are always instance invoke expressions
+			if (stmt.containsInvokeExpr() && stmt.getInvokeExpr() instanceof InstanceInvokeExpr) {
+				InstanceInvokeExpr iinv = (InstanceInvokeExpr) stmt.getInvokeExpr();
+				String iinvSig = iinv.getMethodRef().getSubSignature().getString();
+				if(fragmentRegistrationMethods.containsKey(iinvSig)){
+					String[] parameters = SootMethodRepresentationParser.v().getParameterTypesFromSubSignature(
+							iinvSig);
+					int indexOfFragmentPara = fragmentRegistrationMethods.get(iinvSig);
+					Value arg = iinv.getArg(indexOfFragmentPara);
+					if (arg.getType() instanceof RefType && arg instanceof Local)
+						for (Unit def : smd.getDefsOfAt((Local) arg, u)) {
+							assert def instanceof DefinitionStmt; 
+							Type tp = ((DefinitionStmt) def).getRightOp().getType();
+							if (tp instanceof RefType) {
+								fragmentClass = ((RefType) tp).getSootClass();
+							}
+						}
+				}
+				
+				
+			}
+		}
+		// Analyze fragment classe
+		if(fragmentClass != null) analyzeFragmentClass(fragmentClass, activityElement);
+	}
+	
+	/**
+	 * Analyzes the given class to find fragment classes and prepare for the next round
+	 * @param sootClass The class to analyze
+	 * @param lifecycleElement The lifecycle element (activity)
+	 * to which the fragment belong
+	 */
+	private void analyzeFragmentClass(SootClass sootClass, SootClass lifecycleElement) {
+		
+		//if the class is an interface, don't analyze, because interface cann't extends class
+		if (sootClass.isInterface()) return;
+		
+		//if the class is not extended from fragment class, don't analyze
+		boolean isFragment = false;
+		SootClass superClass = sootClass.getSuperclass();
+		while(superClass != null){
+			if(superClass.getName() == "android.app.Fragment"){
+				isFragment = true;
+				break;
+			};
+			superClass = superClass.getSuperclass();
+		}
+		if(!isFragment) return;
+		
+		for (SootClass c : Scene.v().getActiveHierarchy().getSubclassesOfIncluding(sootClass)){
+			checkAndAddFragment(c, lifecycleElement);
+		}
+	}
+	
+	/**
+	 * Checks whether the given Soot class comes from a system class. If not,
+	 * it is added to the list of registration fragment.
+	 * @param sootClass The class to check and add
+	 * @param baseClass The base class (activity) to which this
+	 * fragment belongs
+	 */
+	private void checkAndAddFragment(SootClass sootClass, SootClass baseClass) {
+		// Do not analyze system classes
+		if (sootClass.getName().startsWith("android.")
+				|| sootClass.getName().startsWith("java."))
+						return;
+		boolean isNew;
+		if(registedFragments.containsKey(baseClass.getName())){
+			isNew = registedFragments.get(baseClass).add(sootClass);
+		}
+		else{
+			Set<SootClass> fragments = new HashSet<SootClass>();
+			isNew = fragments.add(sootClass);
+			registedFragments.put(baseClass.getName(), fragments);
+		}
 	}
 	
 	/**
