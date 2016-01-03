@@ -67,13 +67,41 @@ public class AnalyzeJimpleClass {
 	private final InfoflowAndroidConfiguration config;
 	private final Set<String> entryPointClasses;
 	private final Set<String> androidCallbacks;
-	private final Map<String, Integer> fragmentRegistrationMethods = new HashMap<String, Integer>() {{  
+	public static final Map<String, Integer> fragmentRegistrationMethods = new HashMap<String, Integer>() {{  
 	       put("android.app.FragmentTransaction add(android.app.Fragment,java.lang.String)", 0);
 	       put("android.app.FragmentTransaction add(int,android.app.Fragment)", 1);
 	       put("android.app.FragmentTransaction add(int,android.app.Fragment,java.lang.String)", 1);
 	       put("android.app.FragmentTransaction replace(int,android.app.Fragment)", 1);
 	       put("android.app.FragmentTransaction replace(int,android.app.Fragment,java.lang.String)", 1);
 	}};  
+	
+	public static final String FRAGMENTCLASS = "android.app.Fragment";
+	
+	public static final String FRAGMENT_ONCREATE = "void onCreate(android.os.Bundle)";
+	public static final String FRAGMENT_ONSTART = "void onStart()";
+	public static final String FRAGMENT_ONVIEWSTATERESTORED = "void onViewStateRestored(android.os.Bundle)";
+	public static final String FRAGMENT_ONATTACH= "void onAttach(android.app.Activity)";
+	public static final String FRAGMENT_ONRESUME = "void onResume()";
+	public static final String FRAGMENT_ONCREATEVIEW = "android.view.View onCreateView(android.view.LayoutInflater,android.view.ViewGroup,android.os.Bundle)";
+	public static final String FRAGMENT_ONACTIVITYCREATED = "void onActivityCreated(android.os.Bundle)";
+	public static final String FRAGMENT_ONDESTROYVIEW = "void onDestroyView()";
+	public static final String FRAGMENT_ONPAUSE = "void onPause()";
+	public static final String FRAGMENT_ONSTOP = "void onStop()";
+	public static final String FRAGMENT_ONDETACH = "void onDetach()";
+	public static final String FRAGMENT_ONDESTROY = "void onDestroy()";
+	
+	private static final String[] fragmentMethods = {FRAGMENT_ONCREATE,
+			FRAGMENT_ONVIEWSTATERESTORED,
+			FRAGMENT_ONATTACH,
+			FRAGMENT_ONSTART,
+			FRAGMENT_ONRESUME,
+			FRAGMENT_ONCREATEVIEW,
+			FRAGMENT_ONACTIVITYCREATED,
+			FRAGMENT_ONDESTROYVIEW,
+			FRAGMENT_ONPAUSE,
+			FRAGMENT_ONSTOP,
+			FRAGMENT_ONDETACH,
+			FRAGMENT_ONDESTROY};
 	
 	private final Map<String, Set<SootMethodAndClass>> callbackMethods =
 			new HashMap<String, Set<SootMethodAndClass>>();
@@ -281,7 +309,8 @@ public class AnalyzeJimpleClass {
 		SmartLocalDefs smd = new SmartLocalDefs(graph, new SimpleLiveLocals(graph));
 
 		// Iterate over all statement and find Fragment registration
-		SootClass fragmentClass = null;
+		Set<SootClass> fragmentClasses = new HashSet<SootClass>();
+		
 		for (Unit u : method.retrieveActiveBody().getUnits()) {
 			Stmt stmt = (Stmt) u;
 			// fragment registrations are always instance invoke expressions
@@ -292,6 +321,7 @@ public class AnalyzeJimpleClass {
 					String[] parameters = SootMethodRepresentationParser.v().getParameterTypesFromSubSignature(
 							iinvSig);
 					int indexOfFragmentPara = fragmentRegistrationMethods.get(iinvSig);
+					SootClass fragmentClass;
 					Value arg = iinv.getArg(indexOfFragmentPara);
 					if (arg.getType() instanceof RefType && arg instanceof Local)
 						for (Unit def : smd.getDefsOfAt((Local) arg, u)) {
@@ -299,6 +329,7 @@ public class AnalyzeJimpleClass {
 							Type tp = ((DefinitionStmt) def).getRightOp().getType();
 							if (tp instanceof RefType) {
 								fragmentClass = ((RefType) tp).getSootClass();
+								fragmentClasses.add(fragmentClass);
 							}
 						}
 				}
@@ -306,8 +337,10 @@ public class AnalyzeJimpleClass {
 				
 			}
 		}
-		// Analyze fragment classe
-		if(fragmentClass != null) analyzeFragmentClass(fragmentClass, activityElement);
+		// Analyze fragment classes
+		for(SootClass c: fragmentClasses){
+			analyzeFragmentClass(c, activityElement);
+		}
 	}
 	
 	/**
@@ -325,7 +358,7 @@ public class AnalyzeJimpleClass {
 		boolean isFragment = false;
 		SootClass superClass = sootClass.getSuperclass();
 		while(superClass != null){
-			if(superClass.getName() == "android.app.Fragment"){
+			if(superClass.getName() == FRAGMENTCLASS){
 				isFragment = true;
 				break;
 			};
@@ -352,13 +385,60 @@ public class AnalyzeJimpleClass {
 						return;
 		boolean isNew;
 		if(registedFragments.containsKey(baseClass.getName())){
-			isNew = registedFragments.get(baseClass).add(sootClass);
+			isNew = registedFragments.get(baseClass.getName()).add(sootClass);
 		}
 		else{
 			Set<SootClass> fragments = new HashSet<SootClass>();
 			isNew = fragments.add(sootClass);
 			registedFragments.put(baseClass.getName(), fragments);
 		}
+		
+		//if this fragment hasn't been analyzed
+		if(isNew){
+			for(String methodSig : fragmentMethods){
+				SootMethod method = findMethod(sootClass, methodSig);
+				if (method == null) {
+					System.out.println("Could not find Fragment method: " + methodSig);
+					continue;
+				}
+				
+				// If the method is in one of the predefined Android classes, it cannot
+				// contain custom code, so we do not need to call it
+				if (method.getDeclaringClass().getName().equals(FRAGMENTCLASS))
+					continue;
+				
+				// If this method is part of the Android framework, we don't need to call it
+				if (method.getDeclaringClass().getName().startsWith("android."))
+					continue;
+				
+				AndroidMethod am = new AndroidMethod(method);
+				if (this.callbackWorklist.containsKey(baseClass.getName()))
+					this.callbackWorklist.get(baseClass.getName()).add(am);
+				else {
+					Set<SootMethodAndClass> methods = new HashSet<SootMethodAndClass>();
+					isNew = methods.add(am);
+					this.callbackWorklist.put(baseClass.getName(), methods);
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Finds a method with the given signature in the given class or one of its
+	 * super classes
+	 * @param currentClass The current class in which to start the search
+	 * @param subsignature The subsignature of the method to find
+	 * @return The method with the given signature if it has been found,
+	 * otherwise null
+	 */
+	protected SootMethod findMethod(SootClass currentClass, String subsignature){
+		if(currentClass.declaresMethod(subsignature)){
+			return currentClass.getMethod(subsignature);
+		}
+		if(currentClass.hasSuperclass()){
+			return findMethod(currentClass.getSuperclass(), subsignature);
+		}
+		return null;
 	}
 	
 	/**
