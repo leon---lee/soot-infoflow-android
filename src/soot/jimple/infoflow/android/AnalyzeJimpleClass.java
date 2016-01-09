@@ -682,6 +682,10 @@ public class AnalyzeJimpleClass {
 		return this.callbackMethods;
 	}
 	
+	public Map<String, Set<SootClass>> getFragmentComponents() {
+		return this.registedFragments;
+	}
+	
 	public Map<String, Set<Integer>> getLayoutClasses() {
 		return this.layoutClasses;
 	}

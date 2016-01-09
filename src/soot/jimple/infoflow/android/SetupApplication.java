@@ -65,6 +65,8 @@ public class SetupApplication {
 	private ISourceSinkDefinitionProvider sourceSinkProvider;
 	private final Map<String, Set<SootMethodAndClass>> callbackMethods =
 			new HashMap<String, Set<SootMethodAndClass>>(10000);
+	private final Map<String, Set<SootClass>> fragmentComponents =
+			new HashMap<String, Set<SootClass>>();
 
 	private InfoflowAndroidConfiguration config = new InfoflowAndroidConfiguration();
 	
@@ -470,6 +472,17 @@ public class SetupApplication {
 				}
 			}
 			
+			// Collect the results of fragment component
+			for (Entry<String, Set<SootClass>> entry : jimpleClass.getFragmentComponents().entrySet()) {
+				if (this.fragmentComponents.containsKey(entry.getKey())) {
+					if (this.fragmentComponents.get(entry.getKey()).addAll(entry.getValue()))
+						hasChanged = true;
+				} else {
+					this.fragmentComponents.put(entry.getKey(), new HashSet<>(entry.getValue()));
+					hasChanged = true;
+				}
+			}			
+			
 			if (entrypoints.addAll(jimpleClass.getDynamicManifestComponents()))
 				hasChanged = true;
 		}
@@ -723,6 +736,15 @@ public class SetupApplication {
 				methodSigs.add(am.getSignature());
 		}
 		entryPointCreator.setCallbackFunctions(callbackMethodSigs);
+		
+		Map<String, List<String>> fragmentComponentSigs = new HashMap<String, List<String>>();
+		for (String className : this.fragmentComponents.keySet()) {
+			List<String> componentSigs = new ArrayList<String>();
+			fragmentComponentSigs.put(className, componentSigs);
+			for (SootClass ac : this.fragmentComponents.get(className))
+				componentSigs.add(ac.getName());
+		}
+		entryPointCreator.setFragmentComponents(fragmentComponentSigs);;
 		return entryPointCreator;
 	}
 
