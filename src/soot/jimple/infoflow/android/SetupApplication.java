@@ -65,6 +65,8 @@ public class SetupApplication {
 	private ISourceSinkDefinitionProvider sourceSinkProvider;
 	private final Map<String, Set<SootMethodAndClass>> callbackMethods =
 			new HashMap<String, Set<SootMethodAndClass>>(10000);
+	private final Map<String, Set<SootClass>> fragmentComponents =
+			new HashMap<String, Set<SootClass>>();
 
 	private InfoflowAndroidConfiguration config = new InfoflowAndroidConfiguration();
 	
@@ -469,6 +471,17 @@ public class SetupApplication {
 					hasChanged = true;
 				}
 			}
+			
+			// Collect the results of fragment component
+			for (Entry<String, Set<SootClass>> entry : jimpleClass.getFragmentComponents().entrySet()) {
+				if (this.fragmentComponents.containsKey(entry.getKey())) {
+					if (this.fragmentComponents.get(entry.getKey()).addAll(entry.getValue()))
+						hasChanged = true;
+				} else {
+					this.fragmentComponents.put(entry.getKey(), new HashSet<>(entry.getValue()));
+					hasChanged = true;
+				}
+			}			
 			
 			if (entrypoints.addAll(jimpleClass.getDynamicManifestComponents()))
 				hasChanged = true;
