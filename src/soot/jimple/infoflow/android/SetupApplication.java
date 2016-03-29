@@ -472,17 +472,6 @@ public class SetupApplication {
 				}
 			}
 			
-			// Collect the results of fragment component
-			for (Entry<String, Set<SootClass>> entry : jimpleClass.getFragmentComponents().entrySet()) {
-				if (this.fragmentComponents.containsKey(entry.getKey())) {
-					if (this.fragmentComponents.get(entry.getKey()).addAll(entry.getValue()))
-						hasChanged = true;
-				} else {
-					this.fragmentComponents.put(entry.getKey(), new HashSet<>(entry.getValue()));
-					hasChanged = true;
-				}
-			}			
-			
 			if (entrypoints.addAll(jimpleClass.getDynamicManifestComponents()))
 				hasChanged = true;
 		}
