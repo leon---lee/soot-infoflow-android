@@ -362,7 +362,8 @@ public class AnalyzeJimpleClass {
 				isFragment = true;
 				break;
 			};
-			superClass = superClass.getSuperclass();
+			if(superClass.hasSuperclass()) superClass = superClass.getSuperclass();
+			else superClass = null;
 		}
 		if(!isFragment) return;
 		

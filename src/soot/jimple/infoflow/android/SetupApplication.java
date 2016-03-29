@@ -744,7 +744,6 @@ public class SetupApplication {
 			for (SootClass ac : this.fragmentComponents.get(className))
 				componentSigs.add(ac.getName());
 		}
-		entryPointCreator.setFragmentComponents(fragmentComponentSigs);;
 		return entryPointCreator;
 	}
 
