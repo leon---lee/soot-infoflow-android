@@ -738,13 +738,20 @@ public class SetupApplication {
 		entryPointCreator.setCallbackFunctions(callbackMethodSigs);
 		
 		Map<String, List<String>> fragmentComponentSigs = new HashMap<String, List<String>>();
+		int fragmentNum = 0;
 		for (String className : this.fragmentComponents.keySet()) {
 			List<String> componentSigs = new ArrayList<String>();
 			fragmentComponentSigs.put(className, componentSigs);
-			for (SootClass ac : this.fragmentComponents.get(className))
+			for (SootClass ac : this.fragmentComponents.get(className)){
 				componentSigs.add(ac.getName());
+				fragmentNum++;
+			}
 		}
-		entryPointCreator.setFragmentComponents(fragmentComponentSigs);;
+		System.out.println("********************************************************************");
+		System.out.println("there are " + fragmentNum + " fragment in this app.");
+		System.out.println("********************************************************************");
+		entryPointCreator.setFragmentComponents(fragmentComponentSigs);
+		
 		return entryPointCreator;
 	}
 
