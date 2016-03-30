@@ -16,6 +16,15 @@ public class InfoflowAndroidConfiguration extends InfoflowConfiguration {
 	private PathBuilder pathBuilder = PathBuilder.ContextInsensitiveSourceFinder;
 	
 	private boolean enableCallbacks = true;
+	private boolean enableFragments = true;
+	public boolean getEnableFragments() {
+		return enableFragments;
+	}
+
+	public void setEnableFragments(boolean enableFragments) {
+		this.enableFragments = enableFragments;
+	}
+
 	private boolean enableCallbackSources = true;
 	
 	private LayoutMatchingMode layoutMatchingMode = LayoutMatchingMode.MatchSensitiveOnly;

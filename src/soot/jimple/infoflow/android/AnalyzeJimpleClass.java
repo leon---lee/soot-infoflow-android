@@ -73,9 +73,16 @@ public class AnalyzeJimpleClass {
 	       put("android.app.FragmentTransaction add(int,android.app.Fragment,java.lang.String)", 1);
 	       put("android.app.FragmentTransaction replace(int,android.app.Fragment)", 1);
 	       put("android.app.FragmentTransaction replace(int,android.app.Fragment,java.lang.String)", 1);
+	       put("android.support.v4.app.FragmentTransaction add(android.support.v4.app.Fragment,java.lang.String)", 0);
+	       put("android.support.v4.app.FragmentTransaction add(int,android.support.v4.app.Fragment)", 1);
+	       put("android.support.v4.app.FragmentTransaction add(int,android.support.v4.app.Fragment,java.lang.String)", 1);
+	       put("android.support.v4.app.FragmentTransaction replace(int,android.support.v4.app.Fragment)", 1);
+	       put("android.support.v4.app.FragmentTransaction replace(int,android.support.v4.app.Fragment,java.lang.String)", 1);
+	       
 	}};  
 	
 	public static final String FRAGMENTCLASS = "android.app.Fragment";
+	public static final String FRAGMENTCLASS_V4 = "android.support.v4.app.Fragment";
 	
 	public static final String FRAGMENT_ONCREATE = "void onCreate(android.os.Bundle)";
 	public static final String FRAGMENT_ONSTART = "void onStart()";
@@ -173,6 +180,10 @@ public class AnalyzeJimpleClass {
 				// Process the callback classes directly reachable from the
 				// entry points
 				for (String className : entryPointClasses) {
+					if(className.equals("com.douban.frodo.activity.WishListActivity")){
+						int a = 0;
+						a++;
+					}
 					SootClass sc = Scene.v().getSootClass(className);
 					List<MethodOrMethodContext> methods = new ArrayList<MethodOrMethodContext>();
 					methods.addAll(sc.getMethods());

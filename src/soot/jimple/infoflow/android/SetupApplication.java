@@ -66,7 +66,7 @@ public class SetupApplication {
 	private final Map<String, Set<SootMethodAndClass>> callbackMethods =
 			new HashMap<String, Set<SootMethodAndClass>>(10000);
 	private final Map<String, Set<SootClass>> fragmentComponents =
-			new HashMap<String, Set<SootClass>>();
+			new HashMap<String, Set<SootClass>>(1000);
 
 	private InfoflowAndroidConfiguration config = new InfoflowAndroidConfiguration();
 	
@@ -367,9 +367,9 @@ public class SetupApplication {
 
 		// Add the callback methods
 		LayoutFileParser lfp = null;
-		if (config.getEnableCallbacks()) {
+		if (config.getEnableCallbacks() || config.getEnableFragments()) {
 			lfp = new LayoutFileParser(this.appPackageName, resParser);
-			calculateCallbackMethods(resParser, lfp);
+			calculateCallbackMethodsAndFragments(resParser, lfp);
 
 			// Some informational output
 			System.out.println("Found " + lfp.getUserControls() + " layout controls");
@@ -428,7 +428,7 @@ public class SetupApplication {
 	 * @throws IOException
 	 *             Thrown if a required configuration cannot be read
 	 */
-	private void calculateCallbackMethods(ARSCFileParser resParser, LayoutFileParser lfp) throws IOException {
+	private void calculateCallbackMethodsAndFragments(ARSCFileParser resParser, LayoutFileParser lfp) throws IOException {
 		AnalyzeJimpleClass jimpleClass = null;
 
 		boolean hasChanged = true;
@@ -438,7 +438,7 @@ public class SetupApplication {
 			// Create the new iteration of the main method
 			soot.G.reset();
 			initializeSoot();
-			createMainMethod();
+			//createMainMethod();
 
 			if (jimpleClass == null) {
 				// Collect the callback interfaces implemented in the app's
@@ -532,6 +532,10 @@ public class SetupApplication {
 					System.err.println("Unexpected resource type for layout class");
 			}
 		}
+		if(!config.getEnableCallbacks())
+			callbackMethods.clear();
+		if(!config.getEnableFragments())
+			fragmentComponents.clear();
 
 		// Add the callback methods as sources and sinks
 		{
@@ -540,6 +544,13 @@ public class SetupApplication {
 				callbacksPlain.addAll(set);
 			System.out.println("Found " + callbacksPlain.size() + " callback methods for "
 					+ this.callbackMethods.size() + " components");
+		}
+		{
+			Set<SootClass> callbacksPlain = new HashSet<SootClass>();
+			for (Set<SootClass> set : this.fragmentComponents.values())
+				callbacksPlain.addAll(set);
+			System.out.println("Found " + callbacksPlain.size() + " fragment components for "
+					+ this.fragmentComponents.size() + " components");
 		}
 	}
 	

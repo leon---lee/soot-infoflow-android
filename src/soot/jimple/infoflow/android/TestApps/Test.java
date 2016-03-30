@@ -277,6 +277,10 @@ public class Test {
 				config.setEnableCallbacks(false);
 				i++;
 			}
+			else if (args[i].equalsIgnoreCase("--nofragments")) {
+				config.setEnableFragments(false);
+				i++;
+			}
 			else if (args[i].equalsIgnoreCase("--noexceptions")) {
 				config.setEnableExceptionTracking(false);
 				i++;
