@@ -21,7 +21,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -112,6 +114,7 @@ public class Test {
 	private static String summaryPath = "";
 	private static String resultFilePath = "";
 	
+	private static BufferedWriter bufferedWriter = null;
 	private static boolean DEBUG = false;
 
 	private static IIPCManager ipcManager = null;
@@ -145,6 +148,10 @@ public class Test {
 			}
 			outputDir.delete();
 		}
+		
+		String fragmentStaticsFilePath = "/home/feng/FlowDroidFragmentResult/fragmentStatics.txt";
+		FileWriter fileWriter = new FileWriter(fragmentStaticsFilePath, true);
+		bufferedWriter = new BufferedWriter(fileWriter);
 		
 		// Parse additional command-line arguments
 		if (!parseAdditionalOptions(args))
@@ -185,8 +192,14 @@ public class Test {
 			}
 		}
 		
+		String analyzedFilePath = "/home/feng/FlowDroidFragmentResult/analyzedFileList.txt";
+		FileWriter fileWriter1 = new FileWriter(analyzedFilePath, true);
+		BufferedWriter bufferedWriter1 = new BufferedWriter(fileWriter1);
+		
 		int oldRepeatCount = repeatCount;
 		for (final String fileName : apkFiles) {
+			bufferedWriter1.write(fileName + "\n");
+			//bufferedWriter1.flush();
 			repeatCount = oldRepeatCount;
 			final String fullFilePath;
 			System.gc();
@@ -217,9 +230,10 @@ public class Test {
 					runAnalysis(fullFilePath, args[1]);
 				repeatCount--;
 			}
-			
 			System.gc();
 		}
+		bufferedWriter1.close();
+		bufferedWriter.close();
 	}
 
 	/**
@@ -279,6 +293,10 @@ public class Test {
 			}
 			else if (args[i].equalsIgnoreCase("--nofragments")) {
 				config.setEnableFragments(false);
+				i++;
+			}
+			else if (args[i].equalsIgnoreCase("--evalutefragnum")) {
+				config.setEvaluteFragNum(true);
 				i++;
 			}
 			else if (args[i].equalsIgnoreCase("--noexceptions")) {
@@ -558,30 +576,55 @@ public class Test {
 				app.printSources();
 			}
 			
-			System.out.println("Running data flow analysis...");
-			final InfoflowResults res = app.runInfoflow(new MyResultsAvailableHandler());
-			System.out.println("Analysis has run for " + (System.nanoTime() - beforeRun) / 1E9 + " seconds");
-			
-			// Write the results into a file if requested
-			if (resultFilePath != null && !resultFilePath.isEmpty()) {
-				InfoflowResultsSerializer serializer = new InfoflowResultsSerializer();
-				serializer.serialize(res, resultFilePath);
+			InfoflowResults res = null;
+			if(config.getEvaluteFragNum()){
+				Map<String, List<String>> fragmentComponentSigs = app.getEntryPointCreator().getFragmentComponents();
+				Set<String> fragments = new HashSet<String>();
+				for (List<String> set : fragmentComponentSigs.values())
+					for(String sc : set)
+						fragments.add(sc);
+				//the format of the output is 'package name;Activity number;The number of Activity which carries fragment;fragment number'
+				String staticsInfo = fileName + ";" + 
+									 app.getAppPackageName() + ";" + 
+									 app.getTargetSDKVersion() + ";" + 
+									 app.getEntrypointClasses().size() + ";" + 
+									 fragmentComponentSigs.keySet().size() + ";" + 
+									 fragments.size() + "\n";
+				
+				bufferedWriter.write(staticsInfo);
+				//bufferedWriter.flush();
+				
+			}
+			else {
+				System.out.println("Running data flow analysis...");
+				res = app.runInfoflow(new MyResultsAvailableHandler());
+				System.out.println("Analysis has run for " + (System.nanoTime() - beforeRun) / 1E9 + " seconds");
+
+				// Write the results into a file if requested
+				if (resultFilePath != null && !resultFilePath.isEmpty()) {
+					InfoflowResultsSerializer serializer = new InfoflowResultsSerializer();
+					serializer.serialize(res, resultFilePath);
+				}
 			}
 			
 			return res;
 		} catch (IOException ex) {
 			System.err.println("Could not read file: " + ex.getMessage());
 			ex.printStackTrace();
-			throw new RuntimeException(ex);
+			//throw new RuntimeException(ex);
 		} catch (XmlPullParserException ex) {
 			System.err.println("Could not read Android manifest file: " + ex.getMessage());
 			ex.printStackTrace();
-			throw new RuntimeException(ex);
+			//throw new RuntimeException(ex);
 		} catch (XMLStreamException ex) {
 			System.err.println("Could not write data flow results to file: " + ex.getMessage());
 			ex.printStackTrace();
-			throw new RuntimeException(ex);
+			//throw new RuntimeException(ex);
+		} catch (Throwable t){
+//			System.err.println("Could not analyze apk: " + t.getMessage());
+//			t.printStackTrace();
 		}
+		return null;
 	}
 	
 	/**

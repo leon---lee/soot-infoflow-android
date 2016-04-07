@@ -75,6 +75,12 @@ public class SetupApplication {
 
 	private List<ARSCFileParser.ResPackage> resourcePackages = null;
 	private String appPackageName = "";
+	private int targetSDKVersion = 0;
+
+
+	public int getTargetSDKVersion() {
+		return targetSDKVersion;
+	}
 
 	private final String androidJar;
 	private final boolean forceAndroidJar;
@@ -91,6 +97,11 @@ public class SetupApplication {
 	private IIPCManager ipcManager = null;
 	
 	private long maxMemoryConsumption = -1;
+	
+
+	public String getAppPackageName() {
+		return appPackageName;
+	}
 	
 	/**
 	 * Creates a new instance of the {@link SetupApplication} class
@@ -356,6 +367,7 @@ public class SetupApplication {
 		this.sourceSinkProvider = sourcesAndSinks;
 		ProcessManifest processMan = new ProcessManifest(apkFileLocation);
 		this.appPackageName = processMan.getPackageName();
+		this.targetSDKVersion = processMan.targetSdkVersion();
 		this.entrypoints = processMan.getEntryPointClasses();
 
 		// Parse the resource file
@@ -545,13 +557,14 @@ public class SetupApplication {
 			System.out.println("Found " + callbacksPlain.size() + " callback methods for "
 					+ this.callbackMethods.size() + " components");
 		}
-		{
-			Set<SootClass> callbacksPlain = new HashSet<SootClass>();
-			for (Set<SootClass> set : this.fragmentComponents.values())
-				callbacksPlain.addAll(set);
-			System.out.println("Found " + callbacksPlain.size() + " fragment components for "
-					+ this.fragmentComponents.size() + " components");
-		}
+//		{
+//			Set<String> callbacksPlain = new HashSet<String>();
+//			for (Set<SootClass> set : this.fragmentComponents.values())
+//				for(SootClass sc : set)
+//					callbacksPlain.add(sc.getName());
+//			System.out.println("Found " + callbacksPlain.size() + " fragment components for "
+//					+ this.fragmentComponents.size() + " components");
+//		}
 	}
 	
 	/**

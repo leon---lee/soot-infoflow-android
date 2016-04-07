@@ -17,6 +17,15 @@ public class InfoflowAndroidConfiguration extends InfoflowConfiguration {
 	
 	private boolean enableCallbacks = true;
 	private boolean enableFragments = true;
+	private boolean enableEvaluteFragNum = false;
+	public boolean getEvaluteFragNum() {
+		return enableEvaluteFragNum;
+	}
+
+	public void setEvaluteFragNum(boolean evaluteFragNum) {
+		this.enableEvaluteFragNum = evaluteFragNum;
+	}
+
 	public boolean getEnableFragments() {
 		return enableFragments;
 	}

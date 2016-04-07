@@ -180,10 +180,6 @@ public class AnalyzeJimpleClass {
 				// Process the callback classes directly reachable from the
 				// entry points
 				for (String className : entryPointClasses) {
-					if(className.equals("com.douban.frodo.activity.WishListActivity")){
-						int a = 0;
-						a++;
-					}
 					SootClass sc = Scene.v().getSootClass(className);
 					List<MethodOrMethodContext> methods = new ArrayList<MethodOrMethodContext>();
 					methods.addAll(sc.getMethods());
@@ -369,7 +365,7 @@ public class AnalyzeJimpleClass {
 		boolean isFragment = false;
 		SootClass superClass = sootClass.getSuperclass();
 		while(superClass != null){
-			if(superClass.getName() == FRAGMENTCLASS){
+			if((superClass.getName() == FRAGMENTCLASS) || (superClass.getName() == FRAGMENTCLASS_V4)){
 				isFragment = true;
 				break;
 			};
