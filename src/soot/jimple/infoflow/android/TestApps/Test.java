@@ -78,17 +78,17 @@ public class Test {
 			if (results == null) {
 				print("No results found.");
 			}
-			else {
-				for (ResultSinkInfo sink : results.getResults().keySet()) {
-					print("Found a flow to sink " + sink + ", from the following sources:");
-					for (ResultSourceInfo source : results.getResults().get(sink)) {
-						print("\t- " + source.getSource() + " (in "
-								+ cfg.getMethodOf(source.getSource()).getSignature()  + ")");
-						if (source.getPath() != null)
-							print("\t\ton Path " + Arrays.toString(source.getPath()));
-					}
-				}
-			}
+//			else {
+//				for (ResultSinkInfo sink : results.getResults().keySet()) {
+//					print("Found a flow to sink " + sink + ", from the following sources:");
+//					for (ResultSourceInfo source : results.getResults().get(sink)) {
+//						print("\t- " + source.getSource() + " (in "
+//								+ cfg.getMethodOf(source.getSource()).getSignature()  + ")");
+//						if (source.getPath() != null)
+//							print("\t\ton Path " + Arrays.toString(source.getPath()));
+//					}
+//				}
+//			}
 		}
 
 		private void print(String string) {
@@ -149,7 +149,7 @@ public class Test {
 			outputDir.delete();
 		}
 		
-		String fragmentStaticsFilePath = "/home/feng/FlowDroidFragmentResult/fragmentStatics.txt";
+		String fragmentStaticsFilePath = "C:/Users/feng/Desktop/FlowDroidFragmentResult/fragmentStatics.txt";
 		FileWriter fileWriter = new FileWriter(fragmentStaticsFilePath, true);
 		bufferedWriter = new BufferedWriter(fileWriter);
 		
@@ -192,14 +192,14 @@ public class Test {
 			}
 		}
 		
-		String analyzedFilePath = "/home/feng/FlowDroidFragmentResult/analyzedFileList.txt";
+		String analyzedFilePath = "C:/Users/feng/Desktop/FlowDroidFragmentResult/analyzedFileList.txt";
 		FileWriter fileWriter1 = new FileWriter(analyzedFilePath, true);
 		BufferedWriter bufferedWriter1 = new BufferedWriter(fileWriter1);
 		
 		int oldRepeatCount = repeatCount;
 		for (final String fileName : apkFiles) {
 			bufferedWriter1.write(fileName + "\n");
-			//bufferedWriter1.flush();
+			bufferedWriter1.flush();
 			repeatCount = oldRepeatCount;
 			final String fullFilePath;
 			System.gc();
@@ -296,8 +296,16 @@ public class Test {
 				i++;
 			}
 			else if (args[i].equalsIgnoreCase("--evalutefragnum")) {
-				config.setEvaluteFragNum(true);
-				i++;
+				String algo = args[i+1];
+				if (algo.equalsIgnoreCase("appFragNum"))
+					config.setEvaluteFragNum(true);
+				else if (algo.equalsIgnoreCase("activityFragNum"))
+					config.setEnableEvaluateActivityFragNum(true);
+				else {
+					System.err.println("Invalid evaluate mode");
+					return false;
+				}
+				i += 2;
 			}
 			else if (args[i].equalsIgnoreCase("--noexceptions")) {
 				config.setEnableExceptionTracking(false);
@@ -423,16 +431,19 @@ public class Test {
 		
 		try {
 			System.out.println("Running infoflow task...");
-			task.get(timeout, TimeUnit.MINUTES);
+			task.get(timeout, TimeUnit.SECONDS);
 		} catch (ExecutionException e) {
 			System.err.println("Infoflow computation failed: " + e.getMessage());
 			e.printStackTrace();
+			task.cancel(true);
 		} catch (TimeoutException e) {
 			System.err.println("Infoflow computation timed out: " + e.getMessage());
 			e.printStackTrace();
+			task.cancel(true);
 		} catch (InterruptedException e) {
 			System.err.println("Infoflow computation interrupted: " + e.getMessage());
 			e.printStackTrace();
+			task.cancel(true);
 		}
 		
 		// Make sure to remove leftovers
@@ -577,22 +588,35 @@ public class Test {
 			}
 			
 			InfoflowResults res = null;
-			if(config.getEvaluteFragNum()){
+			if(config.getEvaluteFragNum() || config.isEnableEvaluateActivityFragNum()){
 				Map<String, List<String>> fragmentComponentSigs = app.getEntryPointCreator().getFragmentComponents();
 				Set<String> fragments = new HashSet<String>();
 				for (List<String> set : fragmentComponentSigs.values())
 					for(String sc : set)
 						fragments.add(sc);
-				//the format of the output is 'package name;Activity number;The number of Activity which carries fragment;fragment number'
-				String staticsInfo = fileName + ";" + 
+				String staticsInfo = "";
+				
+				if(config.getEvaluteFragNum())
+					//the format of the output is 'package name;Activity number;The number of Activity which carries fragment;fragment number'
+					staticsInfo = fileName + ";" + 
 									 app.getAppPackageName() + ";" + 
 									 app.getTargetSDKVersion() + ";" + 
 									 app.getEntrypointClasses().size() + ";" + 
 									 fragmentComponentSigs.keySet().size() + ";" + 
 									 fragments.size() + "\n";
+				else{
+					staticsInfo = fileName + ";" + 
+							 app.getAppPackageName() + ";" + 
+							 app.getTargetSDKVersion() + ";" + 
+							 fragmentComponentSigs.keySet().size() + ";";
+					for (List<String> set : fragmentComponentSigs.values())
+						staticsInfo = staticsInfo + set.size() + ",";
+					staticsInfo += "\n";
+				}
+				
 				
 				bufferedWriter.write(staticsInfo);
-				//bufferedWriter.flush();
+				bufferedWriter.flush();
 				
 			}
 			else {
@@ -605,6 +629,14 @@ public class Test {
 					InfoflowResultsSerializer serializer = new InfoflowResultsSerializer();
 					serializer.serialize(res, resultFilePath);
 				}
+				String staticsInfo = "";
+				staticsInfo = fileName + ";" + 
+						 app.getAppPackageName() + ";" + 
+						 app.getTargetSDKVersion() + ";";
+				staticsInfo += res.size()+ ";";
+				staticsInfo += (System.nanoTime() - beforeRun) / 1E9 +"\n";
+				bufferedWriter.write(staticsInfo);
+				bufferedWriter.flush();
 			}
 			
 			return res;
